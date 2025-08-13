@@ -197,11 +197,6 @@ class DisputabilityProcessor:
         json_files = list(self.data_dir.glob("*.json"))
         print(f"找到 {len(json_files)} 個 JSON 檔案")
         return json_files
-    def __init__(self, data_dir="../data/filtered_judgments2", num_workers=8):
-        self.data_dir = Path(data_dir)
-        self.num_workers = num_workers
-        self.results_queue = queue.Queue()
-        self.error_queue = queue.Queue()
         
     def extract_filename_from_json(self, json_file_path):
         """從 JSON 檔案路徑提取檔名（不含 .json 副檔名）"""
@@ -430,26 +425,27 @@ class DisputabilityProcessor:
             if len(errors) > 10:
                 print(f"... 還有 {len(errors) - 10} 個錯誤")
         
-        # 保存處理報告
-        report = {
-            'mode': self.mode,
-            'total_target_files': len(target_files),
-            'success_count': success_count,
-            'skipped_count': skipped_count,
-            'error_count': error_count,
-            'total_time': total_time,
-            'avg_time_per_file': total_time/len(target_files),
-            'disputability_distribution': disputability_distribution,
-            'results': results,
-            'errors': errors
-        }
+        # 保存處理報告（已停用）
+        # report = {
+        #     'mode': self.mode,
+        #     'total_target_files': len(target_files),
+        #     'success_count': success_count,
+        #     'skipped_count': skipped_count,
+        #     'error_count': error_count,
+        #     'total_time': total_time,
+        #     'avg_time_per_file': total_time/len(target_files),
+        #     'disputability_distribution': disputability_distribution,
+        #     'results': results,
+        #     'errors': errors
+        # }
         
-        mode_name = self.mode.replace("/", "_")
-        report_file = f"disputability_{mode_name}_report_{int(time.time())}.json"
-        with open(report_file, 'w', encoding='utf-8') as f:
-            json.dump(report, f, ensure_ascii=False, indent=2)
+        # mode_name = self.mode.replace("/", "_")
+        # report_file = f"disputability_{mode_name}_report_{int(time.time())}.json"
+        # with open(report_file, 'w', encoding='utf-8') as f:
+        #     json.dump(report, f, ensure_ascii=False, indent=2)
         
-        print(f"\n處理報告已保存至: {report_file}")
+        # print(f"\n處理報告已保存至: {report_file}")
+        print(f"\n處理完成（報告生成已停用）")
 
 def main():
     """主函數"""
