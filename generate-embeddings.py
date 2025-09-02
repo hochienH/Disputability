@@ -9,13 +9,19 @@ import os
 import csv
 import pandas as pd
 import torch
-from transformers import BertTokenizer
+from transformers import (
+    BertTokenizerFast,
+    AutoModel,
+)
 from pathlib import Path
 import argparse
 from tqdm import tqdm
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
+
+# 定義資料夾路徑
+DATA_DIR = "/Users/hochienhuang/JRAR/projects/Disputability/data/Dataset"
 
 class SentenceEmbeddingProcessor:
     def __init__(self, max_length=512):
@@ -26,18 +32,38 @@ class SentenceEmbeddingProcessor:
             max_length (int): BERT 輸入的最大長度
         """
         self.max_length = max_length
-        # 為每個線程創建獨立的 tokenizer
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
+        # 為每個線程創建獨立的 tokenizer 和 model
         self._local = threading.local()
-        print("🔄 正在載入 BERT 中文分詞器...")
+        
+        print("🔄 正在載入 BERT 中文模型和分詞器...")
         # 主線程中預載入一次
-        self.tokenizer = BertTokenizer.from_pretrained('bert-base-chinese')
-        print("✅ 分詞器載入完成！")
+        self.tokenizer = BertTokenizerFast.from_pretrained('ckiplab/bert-base-chinese')
+        self.model = AutoModel.from_pretrained('ckiplab/bert-base-chinese')
+        self.model.to(self.device)
+        self.model.eval()  # 設置為評估模式
+        
+        # 獲取模型的隱藏層維度
+        self.hidden_size = self.model.config.hidden_size
+        
+        print(f"✅ 模型載入完成！")
+        print(f"📐 設備: {self.device}")
+        print(f"📏 嵌入維度: {self.hidden_size}")
     
     def get_tokenizer(self):
         """獲取線程本地的 tokenizer"""
         if not hasattr(self._local, 'tokenizer'):
-            self._local.tokenizer = BertTokenizer.from_pretrained('bert-base-chinese')
+            self._local.tokenizer = BertTokenizerFast.from_pretrained('ckiplab/bert-base-chinese')
         return self._local.tokenizer
+    
+    def get_model(self):
+        """獲取線程本地的 model"""
+        if not hasattr(self._local, 'model'):
+            self._local.model = AutoModel.from_pretrained('ckiplab/bert-base-chinese')
+            self._local.model.to(self.device)
+            self._local.model.eval()
+        return self._local.model
     
     def process_sentence(self, sentence):
         """
@@ -212,8 +238,8 @@ class SentenceEmbeddingProcessor:
         Returns:
             dict: 處理結果
         """
-        input_file = f"judgments_sentences_{file_id}.csv"
-        output_file = f"sentences_embeddings_{file_id}.csv"
+        input_file = os.path.join(DATA_DIR, f"judgments_sentences_{file_id}.csv")
+        output_file = os.path.join(DATA_DIR, f"sentences_embeddings_{file_id}.csv")
         
         start_time = time.time()
         
@@ -285,8 +311,8 @@ def main():
         # 單檔案處理（不使用多執行緒）
         print(f"\n📄 處理單個檔案: {args.file_id}")
         
-        input_file = f"judgments_sentences_{args.file_id}.csv"
-        output_file = f"sentences_embeddings_{args.file_id}.csv"
+        input_file = os.path.join(DATA_DIR, f"judgments_sentences_{args.file_id}.csv")
+        output_file = os.path.join(DATA_DIR, f"sentences_embeddings_{args.file_id}.csv")
         
         if not os.path.exists(input_file):
             print(f"❌ 檔案不存在: {input_file}")
@@ -307,7 +333,7 @@ def main():
             future_to_file = {
                 executor.submit(processor.process_file_wrapper, file_id, not args.no_resume): file_id
                 for file_id in file_ids
-                if os.path.exists(f"judgments_sentences_{file_id}.csv")
+                if os.path.exists(os.path.join(DATA_DIR, f"judgments_sentences_{file_id}.csv"))
             }
             
             # 處理完成的任務
@@ -351,7 +377,7 @@ def main():
         print(f"   🚀 平均每檔案: {total_duration/len(results):.1f} 秒" if results else "")
     
     print(f"\n🎯 全部處理完成！")
-    print(f"📁 輸出檔案: sentences_embeddings_*.csv")
+    print(f"📁 輸出檔案: {DATA_DIR}/sentences_embeddings_*.csv")
 
 if __name__ == "__main__":
     main()
